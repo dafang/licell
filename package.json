@@ -1,6 +1,6 @@
 {
   "name": "licell",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Workflow-first Alibaba Cloud CLI for humans and agents — curated workflows with protocol-driven API fallback",
   "type": "module",
   "bin": {
