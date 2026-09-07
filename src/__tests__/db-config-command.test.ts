@@ -87,4 +87,40 @@ describe('RDS config command', () => {
       verify: expect.objectContaining({ performed: false })
     }));
   });
+
+  it('routes confirmed apply through write permission and provider verification', async () => {
+    applyDatabaseConfigMock.mockResolvedValue({
+      stage: 'db.config.apply.pgm-staging',
+      plan: {
+        instanceId: 'pgm-staging',
+        changes: [{ field: 'description', action: 'set', before: 'old', after: 'new' }],
+        changeCount: 1,
+        willExecute: true
+      },
+      execution: { performed: true, requestId: 'request-a' },
+      verify: { performed: true, matched: true, attributes: { description: 'new' } }
+    });
+
+    const cli = await createCli();
+    await cli.parse([
+      'node', 'src/cli.ts', 'db config apply', 'pgm-staging',
+      '--payload', '{"description":"new"}', '--yes'
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(executeWithAuthRecoveryMock).toHaveBeenLastCalledWith(expect.objectContaining({
+      commandLabel: 'licell db config apply',
+      requiredCapabilities: ['rds-config-write']
+    }), expect.any(Function));
+    expect(ensureMutatingActionConfirmedMock).toHaveBeenCalledWith('修改 RDS pgm-staging 实例描述', {
+      yes: true,
+      interactiveTTY: false
+    });
+    expect(applyDatabaseConfigMock).toHaveBeenCalledWith('pgm-staging', { description: 'new' });
+    expect(planDatabaseConfigMock).not.toHaveBeenCalled();
+    expect(emitCommandResultMock).toHaveBeenCalledWith(expect.objectContaining({
+      execution: expect.objectContaining({ performed: true }),
+      verify: expect.objectContaining({ performed: true, matched: true, attributes: { description: 'new' } })
+    }));
+  });
 });

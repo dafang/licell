@@ -1265,6 +1265,16 @@ const CAPABILITY_PROBES: Record<AuthCapability, (auth: AuthConfig) => Promise<Do
       details: [`runtime probe: DescribeDBInstanceAttribute(instanceId), region=${auth.region}`]
     };
   },
+  'rds-config-write': async (auth) => {
+    return {
+      capability: 'rds-config-write',
+      label: AUTH_CAPABILITY_LABELS['rds-config-write'],
+      required: false,
+      status: 'warn',
+      summary: 'RDS 配置修改需在命令执行时针对具体实例验证。',
+      details: [`runtime probe: DescribeDBInstanceAttribute + ModifyDBInstanceDescription(instanceId), region=${auth.region}`]
+    };
+  },
   rdsai: async (auth) => {
     void auth;
     return probeRdsAiCapability();

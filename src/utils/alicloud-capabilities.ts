@@ -46,6 +46,8 @@ const QUERY_STOP_WORDS = new Set(['我', '有', '的', '上', '台', '个', '服
 const PRODUCT_SEARCH_RESOURCE_WORDS = new Set(['实例', 'instance', 'instances', '集群', 'cluster', 'clusters', '节点', 'node', 'nodes']);
 
 const QUERY_EXPANSIONS: Array<[RegExp, string]> = [
+  [/(?:修改|更新|设置|调整)?\s*(?:rds|RDS|数据库)\s*(?:的)?\s*(?:实例)?\s*(?:名称|描述)/g, ' rds modify db instance description update '],
+  [/(?:重命名)\s*(?:rds|RDS|数据库)\s*(?:的)?\s*(?:实例)?/g, ' rds modify db instance description update '],
   [/(?:rds|RDS|数据库)(?:的)?(?:备份|时间点)?(?:恢复|克隆)(?:到)?(?:新)?实例/g, ' rds clone db instance create '],
   [/(?:恢复|克隆)\s*(?:rds|RDS|数据库)(?:到)?(?:新)?实例?/g, ' rds clone db instance create '],
   [/\b(?:k8s|kubernetes|ack|acs)\b/gi, ' cs '],

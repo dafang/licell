@@ -22,6 +22,7 @@ const JOURNEY_MATRIX: JourneyCase[] = [
   { name: 'Kubernetes clusters', product: 'cs', intent: '查看 k8s 集群', expectedRef: 'cs.DescribeClusters', strategy: 'curated-command', commandKey: 'k8s clusters' },
   { name: 'Function inventory', product: 'fc', intent: '列出函数', expectedRef: 'fc.ListFunctions', strategy: 'curated-command', commandKey: 'fn list' },
   { name: 'RDS inventory', product: 'rds', intent: '查看数据库实例', expectedRef: 'rds.DescribeDBInstances', strategy: 'curated-command', commandKey: 'db list' },
+  { name: 'RDS description update', product: 'rds', intent: '修改 RDS 实例描述', expectedRef: 'rds.ModifyDBInstanceDescription', strategy: 'curated-command', commandKey: 'db config apply', action: 'update' },
   { name: 'Redis inventory', product: 'r-kvstore', intent: '查看缓存实例', expectedRef: 'r-kvstore.DescribeInstances', strategy: 'curated-command', commandKey: 'cache list' },
   { name: 'RAM user inventory', product: 'ram', intent: '列出 RAM 用户', expectedRef: 'ram.ListUsers', strategy: 'curated-command', commandKey: 'ram users' },
   { name: 'CAS certificates', product: 'cas', intent: '查看证书', expectedRef: 'cas.ListCert', strategy: 'curated-command', commandKey: 'cert list' },

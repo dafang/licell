@@ -7,7 +7,7 @@ import { Config, DEFAULT_ALI_REGION, type AuthConfig } from './config';
 import { readEnvWithFallback } from './env';
 
 export type AuthIssueKind = 'missing_auth' | 'access_denied' | 'invalid_credentials' | 'unknown';
-export type AuthCapability = 'fc' | 'dns' | 'oss' | 'oss-config-read' | 'oss-config-write' | 'rds' | 'rds-config-read' | 'rdsai' | 'redis' | 'redis-backup-read' | 'redis-backup-write' | 'cdn' | 'vpc' | 'vpc-read' | 'vpc-write' | 'cr' | 'logs' | 'ecs';
+export type AuthCapability = 'fc' | 'dns' | 'oss' | 'oss-config-read' | 'oss-config-write' | 'rds' | 'rds-config-read' | 'rds-config-write' | 'rdsai' | 'redis' | 'redis-backup-read' | 'redis-backup-write' | 'cdn' | 'vpc' | 'vpc-read' | 'vpc-write' | 'cr' | 'logs' | 'ecs';
 
 export const AUTH_CAPABILITY_LABELS: Record<AuthCapability, string> = {
   fc: '函数计算',
@@ -17,6 +17,7 @@ export const AUTH_CAPABILITY_LABELS: Record<AuthCapability, string> = {
   'oss-config-write': 'OSS 高级配置修改',
   rds: 'RDS',
   'rds-config-read': 'RDS 配置读取',
+  'rds-config-write': 'RDS 配置修改',
   rdsai: 'RDS AI (Supabase)',
   redis: 'Redis/Tair',
   'redis-backup-read': 'Redis/Tair 备份策略读取',
@@ -89,6 +90,7 @@ const CAPABILITY_ACTIONS: Record<AuthCapability, string[]> = {
     'rds:DeleteDBInstance'
   ],
   'rds-config-read': ['rds:DescribeDBInstanceAttribute'],
+  'rds-config-write': ['rds:DescribeDBInstanceAttribute', 'rds:ModifyDBInstanceDescription'],
   rdsai: ['rdsai:CreateAppInstance', 'rdsai:DescribeAppInstances', 'rdsai:DeleteAppInstance'],
   redis: [
     'kvstore:DescribeInstances',

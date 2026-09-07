@@ -204,6 +204,15 @@ describe('capability agent guidance', () => {
     }
   );
 
+  it('routes RDS description updates through the guarded config workflow', async () => {
+    const result = await enrichDescribeForAgent(describeAlicloudCapability('rds.ModifyDBInstanceDescription'));
+    expect(result.execution.preferred).toMatchObject({
+      kind: 'curated-command',
+      commandKey: 'db config apply',
+      helpCommand: 'licell db config apply --help --output json'
+    });
+  });
+
   it.each([
     ['DescribeBackups', 'cache backups'],
     ['DescribeBackupPolicy', 'cache backups'],

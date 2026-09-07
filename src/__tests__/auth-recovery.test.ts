@@ -105,4 +105,11 @@ describe('resolveAuthCapabilityActions', () => {
       'rds:DescribeDBInstanceAttribute'
     ]);
   });
+
+  it('keeps RDS config writes on a separate minimal capability', () => {
+    expect(resolveAuthCapabilityActions(['rds-config-write'])).toEqual([
+      'rds:DescribeDBInstanceAttribute',
+      'rds:ModifyDBInstanceDescription'
+    ]);
+  });
 });

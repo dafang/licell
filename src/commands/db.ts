@@ -18,11 +18,13 @@ import {
   listDatabaseParameters,
   listDatabaseAccounts,
   listDatabases,
+  applyDatabaseConfig,
   planDatabaseConfig,
   planDatabaseRestore
 } from '../providers/infra';
 import {
   ensureAuthOrExit,
+  ensureMutatingActionConfirmed,
   createSpinner,
   isInteractiveTTY,
   showIntro,
@@ -112,56 +114,60 @@ const dbBackupsCommand = defineCliCommand({
 
 const dbConfigApplyCommand = defineCliCommand({
   rawName: 'db config apply <instanceId>',
-  description: '预览 RDS 实例描述 desired-state 变更（当前仅支持 dry-run）',
+  description: '规划并应用 RDS 实例描述 desired-state 变更',
   region: { scope: 'binding', binding: 'database', target: { argumentIndex: 0 } },
   options: [
     { rawName: '--dry-run', description: '读取现状并生成差异计划，不修改 RDS 实例' },
+    { rawName: '--yes', description: '确认执行 RDS 实例描述修改' },
     { rawName: '--payload <json>', description: '内联 JSON desired-state，当前仅支持 description' },
     { rawName: '--file <path>', description: '从当前工作目录内的文件读取 JSON desired-state' }
   ],
   descriptor: {
-    title: 'Preview RDS instance config changes',
-    summary: '读取 RDS 实例描述并生成字段级 desired-state 计划；当前版本只提供 dry-run。',
+    title: 'Apply RDS instance config changes',
+    summary: '读取 RDS 实例描述并生成字段级 desired-state 计划；确认后修改并读回验证。',
     examples: [
       `licell db config apply rm-xxx --payload '{"description":"managed-by-licell"}' --dry-run --output json`,
+      `licell db config apply rm-xxx --payload '{"description":"managed-by-licell"}' --yes --output json`,
       'licell db config apply rm-xxx --file ./rds-config.json --dry-run --output json'
     ],
     argumentHints: { instanceId: 'RDS 实例 ID；先用 `licell db list` 获取。' },
     related: ['db info', 'db list', 'capability search'],
     agentTips: [
       'desired-state 当前仅支持非空 description；其他字段会被拒绝。',
-      '当前必须传 --dry-run，命令不会调用任何 RDS 写 API。',
-      '检查 plan.changes[].before/after 后，再决定是否需要后续写入能力。'
+      '先执行 --dry-run 检查 plan.changes[].before/after，再使用相同 desired-state 加 --yes 应用。',
+      '写入只发起一次，命令会自动读回验证；验证未完成时不要立即重复写入。'
     ],
     automation: {
       preferredOutput: 'json',
-      explicitInputs: ['instanceId', '--region', '--dry-run', '--payload|--file']
+      explicitInputs: ['instanceId', '--region', '--dry-run', '--yes', '--payload|--file']
     },
     safety: {
-      level: 'safe',
-      reason: '当前只调用 DescribeDBInstanceAttribute，并固定返回 execution.performed=false。',
-      confirmFlags: []
+      level: 'mutating',
+      reason: '会修改 RDS 实例描述；先审查 dry-run 计划，再使用 --yes 确认并执行。',
+      confirmFlags: ['--yes']
     },
     optionInsights: {
-      '--dry-run': { whenToUse: '当前所有调用都必须使用。', cautions: ['只生成计划，不修改实例描述。'] },
+      '--dry-run': { whenToUse: '执行前预览字段级差异。', cautions: ['只生成计划，不修改实例描述。'] },
+      '--yes': { whenToUse: '确认已审查的 dry-run 计划后执行。', cautions: ['必须与已审查的 desired-state 保持一致。'] },
       '--payload': { whenToUse: '预览单个短 description 时使用。', cautions: ['不要与 --file 同时使用。'] },
       '--file': { whenToUse: '希望审查或版本化 desired-state 时使用。', cautions: ['文件必须位于当前工作目录内。'] }
     },
     recommendedFlow: [
       { title: '定位实例', command: 'licell db list --output json', reason: '获取准确实例 ID 和地域。' },
       { title: '检查实例', command: 'licell db info <instanceId> --output json', reason: '确认当前状态和描述。' },
-      { title: '预览变更', command: 'licell db config apply <instanceId> --file <path> --dry-run --output json', reason: '检查字段级 before/after，不执行写入。' }
+      { title: '预览变更', command: 'licell db config apply <instanceId> --file <path> --dry-run --output json', reason: '检查字段级 before/after，不执行写入。' },
+      { title: '应用并验证', command: 'licell db config apply <instanceId> --file <path> --yes --output json', reason: '修改描述并自动读回验证。' }
     ],
     result: {
-      summary: '返回实例描述的当前值、期望值、差异计划和未执行标记。',
+      summary: '返回实例描述的当前值、期望值、差异计划、执行结果和读回验证。',
       outcomeKey: 'plan.changes',
       fields: [
         { name: 'plan.instanceId', description: '目标 RDS 实例 ID。', required: true },
         { name: 'plan.changes[]', description: 'description 的 before、after 和 set/noop 动作。', required: true },
-        { name: 'plan.willExecute', description: '当前固定为 false。', required: true },
-        { name: 'execution.performed', description: '固定为 false，表示未调用写 API。', required: true },
-        { name: 'verify.performed', description: '固定为 false，表示未执行写后读回。', required: true },
-        { name: 'verify.attributes', description: '规划时读取到的当前实例配置。', required: true }
+        { name: 'plan.willExecute', description: '计划是否包含需要执行的变更。', required: true },
+        { name: 'execution.performed', description: '是否调用了 ModifyDBInstanceDescription。', required: true },
+        { name: 'verify.performed', description: '是否执行了写后读回验证。', required: true },
+        { name: 'verify.attributes', description: '最终读回的实例配置。', required: true }
       ]
     }
   }
@@ -491,27 +497,34 @@ function printDatabaseConfigPlan(plan: Awaited<ReturnType<typeof planDatabaseCon
 
 export function registerDbCommands(cli: CAC) {
   registerCliCommand(cli, dbConfigApplyCommand)
-    .action(async (instanceId: string, options: { dryRun?: unknown; payload?: unknown; file?: unknown }) => {
+    .action(async (instanceId: string, options: { dryRun?: unknown; yes?: unknown; payload?: unknown; file?: unknown }) => {
       await executeWithAuthRecovery({
         commandLabel: commandInvocation(dbConfigApplyCommand),
         interactiveTTY: isInteractiveTTY(),
-        requiredCapabilities: ['rds-config-read']
+        requiredCapabilities: Boolean(options.dryRun) ? ['rds-config-read'] : ['rds-config-write']
       }, async () => {
         ensureAuthOrExit();
-        if (!Boolean(options.dryRun)) {
-          throw new Error('db config apply 当前仅支持 --dry-run，不会执行 RDS 写操作');
-        }
         const id = toPromptValue(instanceId, 'instanceId');
         const desiredState = parseDatabaseConfigDesiredState(options.payload, options.file);
-        const plan = await planDatabaseConfig(id, desiredState);
-        const result = {
-          stage: `db.config.apply.${id}`,
-          plan,
-          execution: { performed: false },
-          verify: { performed: false, attributes: plan.current }
-        };
+        if (Boolean(options.dryRun)) {
+          const plan = await planDatabaseConfig(id, desiredState);
+          const result = {
+            stage: `db.config.apply.${id}`,
+            plan,
+            execution: { performed: false },
+            verify: { performed: false, attributes: plan.current }
+          };
+          if (isJsonOutput()) emitCommandResult(result);
+          else printDatabaseConfigPlan(plan);
+          return result;
+        }
+        await ensureMutatingActionConfirmed(`修改 RDS ${id} 实例描述`, {
+          yes: Boolean(options.yes),
+          interactiveTTY: isInteractiveTTY()
+        });
+        const result = await applyDatabaseConfig(id, desiredState);
         if (isJsonOutput()) emitCommandResult(result);
-        else printDatabaseConfigPlan(plan);
+        else printDatabaseConfigPlan(result.plan);
         return result;
       });
     });

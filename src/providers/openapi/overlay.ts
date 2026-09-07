@@ -105,6 +105,13 @@ const OVERLAYS: AlicloudCapabilityOverlay[] = [
   },
   {
     product: 'rds',
+    operation: 'ModifyDBInstanceDescription',
+    commandKeys: ['db config apply'],
+    confidence: 'curated',
+    notes: ['db config apply plans, confirms, updates, and verifies the RDS instance description through a guarded desired-state workflow.']
+  },
+  {
+    product: 'rds',
     operation: 'CloneDBInstance',
     commandKeys: ['db restore plan'],
     confidence: 'curated',
